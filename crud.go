@@ -27,6 +27,7 @@ type Item struct {
 	read     int
 	priority int
 }
+<<<<<<< HEAD
 
 // тут вы должны уже писать ваши хендлеры
 func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +41,8 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 		3: "normal",
 		5: "high",
 	}
+=======
+>>>>>>> ass
 
 	session, err := r.Cookie("session_id")
 	if err == http.ErrNoCookie {
@@ -60,6 +63,7 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 		user.Scan(&userV)
 		fmt.Println("Scan in userV")
 	}
+<<<<<<< HEAD
 	// } else {
 	// 	fmt.Printf("error1 = %s \n", err.Error())
 	// 	w.Write([]byte(`{"status": 502, "error": "ErrNoRows"}`))
@@ -93,6 +97,11 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 
 	items := []map[string]interface{}{}
 	rows, err := m.DB.Query("SELECT id, subject, read, priority FROM messages WHERE user_id = $1 ORDER BY id ASC", userV)
+=======
+
+	items := []map[string]interface{}
+	rows, err := m.DB.Query("SELECT id, user_id, subject, read, priority FROM messages WHERE user_id = $1 ORDER BY id ASC", user_val)
+>>>>>>> ass
 
 	if err != nil {
 		w.Write([]byte(`{"status": 504, "error": "db error"}`))
@@ -102,10 +111,15 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	fmt.Println("message`s data")
 	for rows.Next() {
+<<<<<<< HEAD
 		//it := map[string]interface{}{}
 		var id, subject interface{}
 		var read, priority int
 		err := rows.Scan(&id, &subject, &read, &priority)
+=======
+		it := map[string]interface{}
+		err := rows.Scan(&it)
+>>>>>>> ass
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
@@ -113,8 +127,13 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("id=%d, subject=%s, read=%d, prio=%d, priomap=%s\n", id, subject, read, priority, PriorityMap[priority])
 		items = append(items, map[string]interface{}{"id": id, "subject": subject, "read": ReadMap[read], "priority": PriorityMap[priority]})
 	}
+<<<<<<< HEAD
 	fmt.Println("message`s data in JSON")
 	result, _ := json.Marshal(map[string]interface{}{"messages": items})
+=======
+
+	result, _ := json.Marshal(items)
+>>>>>>> ass
 	w.Write(result)
 }
 
