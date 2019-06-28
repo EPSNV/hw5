@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 func NewMessager(db *sql.DB) *Messager {
@@ -27,81 +28,60 @@ type Item struct {
 	read     int
 	priority int
 }
-<<<<<<< HEAD
+
+var ReadMap = map[int]bool{
+	0: false,
+	1: true,
+}
+
+var PriorityMap = map[int]string{
+	1: "low",
+	3: "normal",
+	5: "high",
+}
 
 // тут вы должны уже писать ваши хендлеры
-func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
-	ReadMap := map[int]bool{
-		0: false,
-		1: true,
-	}
-
-	PriorityMap := map[int]string{
-		1: "low",
-		3: "normal",
-		5: "high",
-	}
-=======
->>>>>>> ass
-
+func (m *Messager) Auth(r *http.Request) (int, error) {
 	session, err := r.Cookie("session_id")
 	if err == http.ErrNoCookie {
-		w.Write([]byte(`{"status": 501, "error": "db error"}`))
-		return
+		fmt.Println("ErrNoCookie")
+		return 0, err
 	}
 	fmt.Println("session id")
-	var userV int
-	user, err := m.DB.Query("SELECT user_id FROM sessions WHERE id = $1", session.Value)
-	defer user.Close()
+	var userID int
+	rows, err := m.DB.Query("SELECT user_id FROM sessions WHERE id = $1", session.Value)
+	defer rows.Close()
 	if err != nil {
 		fmt.Printf("error2 = %s \n", err.Error())
-		w.Write([]byte(`{"status": 503, "error": "db error"}`))
-		return
+		return 0, err
 	}
 	fmt.Println("user id")
-	for user.Next() {
-		user.Scan(&userV)
-		fmt.Println("Scan in userV")
+	for rows.Next() {
+		err := rows.Scan(&userID)
+		if err != nil {
+			fmt.Printf("Scanerror = %s \n", err.Error())
+			return 0, err
+		}
+		fmt.Println("Scan in userID")
 	}
-<<<<<<< HEAD
-	// } else {
-	// 	fmt.Printf("error1 = %s \n", err.Error())
-	// 	w.Write([]byte(`{"status": 502, "error": "ErrNoRows"}`))
-	// 	return
-	// }
 
-	// user, err := m.DB.Query("SELECT user_id FROM sessions WHERE id = $1", session.Value)
+	fmt.Printf("Scan in userV = %d\n", userID)
+	return userID, nil
+}
+func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 
-	// if err != nil {
-	// 	w.Write([]byte(`{"status": 502, "error": "no auth"}`))
-	// 	return
-	// }
-	// defer user.Close()
-
-	// user_val := 0
-	// i := 0
-	// if user.Next() {
-	// 	err = user.Scan(&user_val)
-	// 	if err != nil {
-	// 		fmt.Printf("error2 = %s \n", err.Error())
-	// 		w.Write([]byte(`{"status": 503, "error": "db error"}`))
-	// 		return
-	// 	}
-	// 	i = i + 1
-	// } else {
-	// 	fmt.Printf("12341234243244")
-	// }
-	// if i == 0 {
-	// 	fmt.Printf("i not changed")
-	// }
-
+	userID, err := m.Auth(r)
+	if err != nil {
+		w.Write([]byte(`{"status": 401, "error": "auth error"}`))
+		return
+	}
+	if userID == 0 {
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error": "no_auth"}`))
+		return
+	}
 	items := []map[string]interface{}{}
-	rows, err := m.DB.Query("SELECT id, subject, read, priority FROM messages WHERE user_id = $1 ORDER BY id ASC", userV)
-=======
-
-	items := []map[string]interface{}
-	rows, err := m.DB.Query("SELECT id, user_id, subject, read, priority FROM messages WHERE user_id = $1 ORDER BY id ASC", user_val)
->>>>>>> ass
+	rows, err := m.DB.Query("SELECT id, subject, read, priority FROM messages WHERE user_id = $1 ORDER BY id ASC", userID)
 
 	if err != nil {
 		w.Write([]byte(`{"status": 504, "error": "db error"}`))
@@ -111,15 +91,10 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	fmt.Println("message`s data")
 	for rows.Next() {
-<<<<<<< HEAD
 		//it := map[string]interface{}{}
 		var id, subject interface{}
 		var read, priority int
 		err := rows.Scan(&id, &subject, &read, &priority)
-=======
-		it := map[string]interface{}
-		err := rows.Scan(&it)
->>>>>>> ass
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
@@ -127,13 +102,8 @@ func (m *Messager) List(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("id=%d, subject=%s, read=%d, prio=%d, priomap=%s\n", id, subject, read, priority, PriorityMap[priority])
 		items = append(items, map[string]interface{}{"id": id, "subject": subject, "read": ReadMap[read], "priority": PriorityMap[priority]})
 	}
-<<<<<<< HEAD
 	fmt.Println("message`s data in JSON")
 	result, _ := json.Marshal(map[string]interface{}{"messages": items})
-=======
-
-	result, _ := json.Marshal(items)
->>>>>>> ass
 	w.Write(result)
 }
 
@@ -142,7 +112,32 @@ func (m *Messager) Mark(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Messager) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, _ := m.Auth(r)
+	// if err != nil {
+	// 	w.Write([]byte(`{"status": 401, "error": "auth error"}`))
+	// 	return
+	// }
+	if userID == 0 {
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error": "no_auth"}`))
+		return
+	}
+	if r.Method != http.MethodDelete {
+		w.Write([]byte(`{"error: "bad method"}`))
+		return
+	}
+	ID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil {
+		w.Write([]byte(`{"status": 400, "error": "bad id"}`))
+		return
+	}
 
+	_, err = m.DB.Exec("DELETE FROM products WHERE id = $1", ID)
+	if err != nil {
+		w.Write([]byte(`{"status": 500, "error": "db err"}`))
+		return
+	}
+	w.Write([]byte(`{"status": 200, "error": ""}`))
 }
 
 func (m *Messager) Create(w http.ResponseWriter, r *http.Request) {
